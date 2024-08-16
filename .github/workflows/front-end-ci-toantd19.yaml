@@ -1,0 +1,115 @@
+name: Frontend Continuous Integration
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  lint-frontend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-frontend-lint
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.14.2'
+
+      - name: Cache Node.js modules
+        id: cache-node
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            ~/.cache
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        run: cd starter/frontend && npm ci
+
+      - name: Lint code
+        run: cd starter/frontend && npm run lint
+
+  test-frontend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-frontend-test
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.14.2'
+
+      - name: Cache Node.js modules
+        id: cache-node
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            ~/.cache
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        run: cd starter/frontend && npm ci
+
+      - name: Run tests
+        run: cd starter/frontend && npm test
+
+  build-frontend:
+    needs: [ lint-frontend, test-frontend ]
+    runs-on: ubuntu-latest
+    environment: movie_dev_ops
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.14.2'
+
+      - name: Cache Node.js modules
+        id: cache-node
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            ~/.cache
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        run: cd starter/frontend && npm ci
+
+      - name: Build Docker image
+        id: build-publish
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
+          IMAGE_TAG: latest
+          BACKEND_ENDPOINT: ${{ secrets.BACKEND_ENDPOINT }}
+        run: |
+          cd starter/frontend
+          docker build --build-arg REACT_APP_MOVIE_API_URL=$BACKEND_ENDPOINT -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+          echo "full_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
