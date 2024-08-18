@@ -1,9 +1,10 @@
-name: Frontend Continuous Integration
+name: Frontend CD
 
 on:
-  pull_request:
+  push:
     branches: [ "main" ]
 
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
@@ -20,21 +21,17 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.14.2'
+          node-version: 18.14.2
 
       - name: Cache Node.js modules
         id: cache-node
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.npm
-            ~/.cache
+          path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+
 
       - name: Install dependencies
-        if: steps.cache-node.outputs.cache-hit != 'true'
         run: cd starter/frontend && npm ci
 
       - name: Lint code
@@ -53,63 +50,62 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.14.2'
+          node-version: 18.14.2
 
       - name: Cache Node.js modules
         id: cache-node
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.npm
-            ~/.cache
+          path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
 
       - name: Install dependencies
-        if: steps.cache-node.outputs.cache-hit != 'true'
         run: cd starter/frontend && npm ci
 
       - name: Run tests
         run: cd starter/frontend && npm test
 
-  build-frontend:
+  frontend-deploy:
     needs: [ lint-frontend, test-frontend ]
     runs-on: ubuntu-latest
-    environment: movie_dev_ops
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          node-version: '18.14.2'
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Cache Node.js modules
-        id: cache-node
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            ~/.cache
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Install dependencies
-        if: steps.cache-node.outputs.cache-hit != 'true'
-        run: cd starter/frontend && npm ci
-
-      - name: Build Docker image
+      - name: Build, tag, and push image to Amazon ECR
         id: build-publish
         env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
-          IMAGE_TAG: latest
+          IMAGE_TAG: toantd19
           BACKEND_ENDPOINT: ${{ secrets.BACKEND_ENDPOINT }}
         run: |
           cd starter/frontend
           docker build --build-arg REACT_APP_MOVIE_API_URL=$BACKEND_ENDPOINT -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
-          echo "full_image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Verify kubectl configuration
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER }} --region us-east-1 && kubectl get nodes
+
+      - name: Update Deployment Image Tag and Deploy
+        working-directory: starter/frontend/k8s
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
+          IMAGE_TAG: toantd19
+        run: |
+          kustomize edit set image frontend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          kustomize build | kubectl apply -f -
+          kubectl rollout restart deployment/frontend
 

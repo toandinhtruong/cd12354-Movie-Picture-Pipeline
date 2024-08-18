@@ -1,0 +1,99 @@
+name: Backend CD
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  lint-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-lint
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install --dev
+
+      - name: Lint code
+        run: cd starter/backend && pipenv run lint
+
+  test-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-test
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install
+
+      - name: Run tests
+        run: cd starter/backend && pipenv run test
+
+  backend-deploy:
+    needs: [ lint-backend, test-backend ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-publish
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          IMAGE_TAG: toantd19
+        run: |
+          cd starter/backend
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Verify kubectl configuration
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER }} --region us-east-1 && kubectl get nodes
+
+      - name: Update Deployment Image Tag and Deploy
+        working-directory: starter/backend/k8s
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          IMAGE_TAG: toantd19
+        run: |
+          kustomize edit set image frontend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          kustomize build | kubectl apply -f -
+          kubectl rollout restart deployment/backend
+

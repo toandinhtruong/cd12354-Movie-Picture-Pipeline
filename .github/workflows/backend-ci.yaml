@@ -1,0 +1,100 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  lint-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-lint
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Cache pipenv environment
+        id: cache-pipenv
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/share/virtualenvs
+          key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install --dev
+
+      - name: Lint code
+        run: cd starter/backend && pipenv run lint
+
+  test-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-test
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Cache pipenv environment
+        id: cache-pipenv
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/share/virtualenvs
+          key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install
+
+      - name: Run tests
+        run: cd starter/backend && pipenv run test
+
+  build-backend:
+    needs: [ lint-backend, test-backend ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install
+
+      - name: Build Docker image
+        id: build-publish
+        env:          
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          IMAGE_TAG: toantd19
+          BACKEND_ENDPOINT: ${{ secrets.BACKEND_ENDPOINT }}
+        run: |
+          cd starter/backend
+          docker build --build-arg REACT_APP_MOVIE_API_URL=$BACKEND_ENDPOINT -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+
