@@ -472,5 +472,5 @@ kustomize build | kubectl apply -f -
 
 ## URL Access
 
-frontend: http://ac8924def946c4dbeb800009ddf547b8-155839967.us-east-1.elb.amazonaws.com/
-backend: http://a1b2b61e1b0bc4d849d74749ec54e4e8-918590951.us-east-1.elb.amazonaws.com/movies
+frontend: http://a9a62293fad1c4b0db69cd999bbc5889-1093219504.us-east-1.elb.amazonaws.com/
+backend: http://a7bd2d5a21293433bb3f6d35840945b8-1699136331.us-east-1.elb.amazonaws.com/movies
