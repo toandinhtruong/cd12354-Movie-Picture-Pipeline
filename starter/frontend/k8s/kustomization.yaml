@@ -6,5 +6,5 @@ resources:
 namespace: default
 images:
 - name: frontend
-  newName: 978251544392.dkr.ecr.us-east-1.amazonaws.com/frontend
+  newName: 730335291032.dkr.ecr.us-east-1.amazonaws.com/frontend
   newTag: toantd19
