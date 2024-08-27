@@ -6,5 +6,5 @@ resources:
 namespace: default
 images:
 - name: backend
-  newName: 730335291032.dkr.ecr.us-east-1.amazonaws.com
+  newName: 730335291032.dkr.ecr.us-east-1.amazonaws.com/backend
   newTag: toantd19
