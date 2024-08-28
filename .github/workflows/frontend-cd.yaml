@@ -113,5 +113,4 @@ jobs:
           helm upgrade --install helm . --force \
             --set image.frontend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.frontend.tag=$IMAGE_TAG \
-            --namespace default \
-            --create-namespace
+            --namespace default

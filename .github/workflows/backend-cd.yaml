@@ -101,6 +101,5 @@ jobs:
           helm upgrade --install helm . --force \
             --set image.backend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.backend.tag=$IMAGE_TAG \
-            --namespace default \
-            --create-namespace
+            --namespace default
 
