@@ -96,7 +96,7 @@ jobs:
         uses: WyriHaximus/github-action-helm3@v3
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
           IMAGE_TAG: toantd19
         with:
           exec: |
