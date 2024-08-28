@@ -104,14 +104,15 @@ jobs:
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER }} --region us-east-1 && kubectl get nodes
 
       - name: Update Deployment Image Tag and Deploy
+        uses: WyriHaximus/github-action-helm3@v3
         working-directory: starter/helm
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
           IMAGE_TAG: toantd19
         run: |
-          helm repo add my-repo https://github.com/toandinhtruong/cd12354-Movie-Picture-Pipeline
-          helm repo update
+          #helm repo add my-repo https://github.com/toandinhtruong/cd12354-Movie-Picture-Pipeline
+          #helm repo update
           helm upgrade --install helm . --force \
             --set image.frontend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.frontend.tag=$IMAGE_TAG \
