@@ -79,6 +79,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: 'v3.9.4'  # specify the Helm version you want to use
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
