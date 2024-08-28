@@ -105,7 +105,9 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
           IMAGE_TAG: toantd19
         run: |
-          kustomize edit set image frontend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          kustomize build | kubectl apply -f -
-          kubectl rollout restart deployment/frontend
-
+          cd starter/helm
+          helm upgrade --install helm . \
+            --set image.frontend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
+            --set image.frontend.tag=$IMAGE_TAG \
+            --namespace default \
+            --create-namespace
