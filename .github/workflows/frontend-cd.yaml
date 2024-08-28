@@ -111,6 +111,7 @@ jobs:
           IMAGE_TAG: toantd19
         with:
           exec: |
+            cd starter/helm
             helm upgrade --install helm . --force \
             --set image.frontend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.frontend.tag=$IMAGE_TAG \
