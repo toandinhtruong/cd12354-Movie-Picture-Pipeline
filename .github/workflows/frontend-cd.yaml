@@ -105,6 +105,7 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
           IMAGE_TAG: toantd19
         run: |
+          pwd
           cd starter/helm
           helm upgrade --install helm . \
             --set image.frontend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
