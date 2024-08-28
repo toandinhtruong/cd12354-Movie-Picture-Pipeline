@@ -91,15 +91,17 @@ jobs:
       - name: Verify kubectl configuration
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER }} --region us-east-1 && kubectl get nodes
 
+
       - name: Update Deployment Image Tag and Deploy
-        working-directory: starter/helm
+        uses: WyriHaximus/github-action-helm3@v3
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          ECR_REPOSITORY: ${{ secrets.ECR_FE_REPO_NAME }}
           IMAGE_TAG: toantd19
-        run: |
-          helm upgrade --install helm . --force \
+        with:
+          exec: |
+            cd starter/helm
+            helm upgrade --install helm . --force \
             --set image.backend.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.backend.tag=$IMAGE_TAG \
             --namespace default
-
