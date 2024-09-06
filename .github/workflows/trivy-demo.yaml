@@ -118,6 +118,8 @@ jobs:
         if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
+          CRITICAL_COUNT: ${{ steps.check-vulnerabilities.outputs.critical_count }}
+          HIGH_COUNT: ${{ steps.check-vulnerabilities.outputs.high_count }}
         run: |
           # Replace the following URL with your Teams webhook URL
           curl -H 'Content-Type: application/json' -d '{
