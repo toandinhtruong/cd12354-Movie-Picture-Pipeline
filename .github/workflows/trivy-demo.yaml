@@ -117,7 +117,7 @@ jobs:
       - name: Send alert to Microsoft Teams if vulnerabilities found
         if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
         env:
-          WEBHOOK_URL: ${{ secrets.Teams_Webhook }}
+          WEBHOOK_URL: ${{ secrets.Teams_Hook }}
         run: |
           # Replace the following URL with your Teams webhook URL
           curl -H 'Content-Type: application/json' -d '{
