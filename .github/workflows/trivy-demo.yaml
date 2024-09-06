@@ -1,4 +1,4 @@
-name: Trivy Demo Scan Image Pass
+name: Trivy Demo Pass
 
 on:
   push:
@@ -98,51 +98,51 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 		  
-    - name: Check for critical and high vulnerabilities
-      id: check-vulnerabilities
-      run: |
-        # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
-        CRITICAL_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")] | length' trivy-report.json)
-        HIGH_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "HIGH")] | length' trivy-report.json)
-        echo "Critical vulnerabilities: $CRITICAL_COUNT"
-        echo "High vulnerabilities: $HIGH_COUNT"
-        echo "::set-output name=critical_count::$CRITICAL_COUNT"
-        echo "::set-output name=high_count::$HIGH_COUNT"
+      - name: Check for critical and high vulnerabilities
+        id: check-vulnerabilities
+        run: |
+          # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
+          CRITICAL_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")] | length' trivy-report.json)
+          HIGH_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "HIGH")] | length' trivy-report.json)
+          echo "Critical vulnerabilities: $CRITICAL_COUNT"
+          echo "High vulnerabilities: $HIGH_COUNT"
+          echo "::set-output name=critical_count::$CRITICAL_COUNT"
+          echo "::set-output name=high_count::$HIGH_COUNT"
 
-    - name: Send alert to Microsoft Teams if vulnerabilities found
-      if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
-      run: |
-        # Replace the following URL with your Teams webhook URL
-        WEBHOOK_URL=${{ secrets.Teams_Webhook }}
+      - name: Send alert to Microsoft Teams if vulnerabilities found
+        if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+        run: |
+          # Replace the following URL with your Teams webhook URL
+          WEBHOOK_URL=${{ secrets.Teams_Webhook }}
         
-        curl -H 'Content-Type: application/json' -d '{
-          "@type": "MessageCard",
-          "@context": "https://schema.org/extensions",
-          "summary": "Trivy Scan Report",
-          "themeColor": "FF0000",
-          "sections": [{
-            "activityTitle": "Trivy Vulnerability Scan",
-            "activitySubtitle": "Critical and High severity vulnerabilities found",
-            "facts": [{
-              "name": "Critical vulnerabilities",
-              "value": "'$CRITICAL_COUNT'"
-            },{
-              "name": "High vulnerabilities",
-              "value": "'$HIGH_COUNT'"
-            }],
-            "markdown": true
-          }]
-        }' $WEBHOOK_URL
+          curl -H 'Content-Type: application/json' -d '{
+            "@type": "MessageCard",
+            "@context": "https://schema.org/extensions",
+            "summary": "Trivy Scan Report",
+            "themeColor": "FF0000",
+            "sections": [{
+              "activityTitle": "Trivy Vulnerability Scan",
+              "activitySubtitle": "Critical and High severity vulnerabilities found",
+              "facts": [{
+                "name": "Critical vulnerabilities",
+                "value": "'$CRITICAL_COUNT'"
+              },{
+                "name": "High vulnerabilities",
+                "value": "'$HIGH_COUNT'"
+              }],
+              "markdown": true
+            }]
+          }' $WEBHOOK_URL
 
-    - name: Fail build if critical or high vulnerabilities found
-      if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
-      run: exit 1
-      
-    - name: Push image to Amazon ECR
-      id: build-publish
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
-        IMAGE_TAG: toantd19
+      - name: Fail build if critical or high vulnerabilities found
+        if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+        run: exit 1		
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-publish
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          IMAGE_TAG: toantd19
         run: |
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
