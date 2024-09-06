@@ -98,6 +98,7 @@ jobs:
         with:
           image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.run_number }}'
           format: 'table'
+          output: 'trivy-report.json'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
