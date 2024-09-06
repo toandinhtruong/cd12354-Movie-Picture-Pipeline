@@ -97,7 +97,7 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
         with:
           image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.run_number }}'
-          format: 'table'
+          format: 'json'
           output: 'trivy-report.json'
           ignore-unfixed: true
           vuln-type: 'os,library'
