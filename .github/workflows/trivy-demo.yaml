@@ -1,0 +1,148 @@
+name: Trivy Demo Scan Image Pass
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  lint-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-lint
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install --dev
+
+      - name: Lint code
+        run: cd starter/backend && pipenv run lint
+
+  test-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-test
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install
+
+      - name: Run tests
+        run: cd starter/backend && pipenv run test
+
+  backend-deploy:
+    needs: [ lint-backend, test-backend ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: 'v3.9.4'  # specify the Helm version you want to use
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-publish
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          IMAGE_TAG: toantd19
+        run: |
+          cd starter/backend
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}" .
+          ###docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: 'docker.io/my-organization/my-app:$${{ github.run_number }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+		  
+    - name: Check for critical and high vulnerabilities
+      id: check-vulnerabilities
+      run: |
+        # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
+        CRITICAL_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")] | length' trivy-report.json)
+        HIGH_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "HIGH")] | length' trivy-report.json)
+        echo "Critical vulnerabilities: $CRITICAL_COUNT"
+        echo "High vulnerabilities: $HIGH_COUNT"
+        echo "::set-output name=critical_count::$CRITICAL_COUNT"
+        echo "::set-output name=high_count::$HIGH_COUNT"
+
+    - name: Send alert to Microsoft Teams if vulnerabilities found
+      if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+      run: |
+        # Replace the following URL with your Teams webhook URL
+        WEBHOOK_URL=${{ secrets.Teams_Webhook }}
+        
+        curl -H 'Content-Type: application/json' -d '{
+          "@type": "MessageCard",
+          "@context": "https://schema.org/extensions",
+          "summary": "Trivy Scan Report",
+          "themeColor": "FF0000",
+          "sections": [{
+            "activityTitle": "Trivy Vulnerability Scan",
+            "activitySubtitle": "Critical and High severity vulnerabilities found",
+            "facts": [{
+              "name": "Critical vulnerabilities",
+              "value": "'$CRITICAL_COUNT'"
+            },{
+              "name": "High vulnerabilities",
+              "value": "'$HIGH_COUNT'"
+            }],
+            "markdown": true
+          }]
+        }' $WEBHOOK_URL
+
+    - name: Fail build if critical or high vulnerabilities found
+      if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+      run: exit 1
+      
+    - name: Push image to Amazon ECR
+      id: build-publish
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+        IMAGE_TAG: toantd19
+        run: |
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
