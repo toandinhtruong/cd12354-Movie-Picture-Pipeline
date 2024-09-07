@@ -88,6 +88,8 @@ jobs:
 
       - name: Check for critical and high vulnerabilities in AWS ECR scan results
         id: check-ecr-vulnerabilities
+        env:
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
         run: |
           aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
           # Count CRITICAL severity vulnerabilities
