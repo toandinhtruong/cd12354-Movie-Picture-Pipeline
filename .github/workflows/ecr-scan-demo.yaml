@@ -86,7 +86,21 @@ jobs:
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}"
           sleep 30 
           aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
+
+      - name: Check for critical and high vulnerabilities in AWS ECR scan results
+        id: check-ecr-vulnerabilities
+        run: |
+          # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
           cat scan-results.json
+          # Count CRITICAL severity vulnerabilities
+          CRITICAL_COUNT=$(jq '[.imageScanFindings.enhancedFindings[]? | select(.severity == "CRITICAL")] | length' scan-results.json || echo "0")
+          # Count HIGH severity vulnerabilities
+          HIGH_COUNT=$(jq '[.imageScanFindings.enhancedFindings[]? | select(.severity == "HIGH")] | length' scan-results.json || echo "0")
+          echo "Critical vulnerabilities: $CRITICAL_COUNT"
+          echo "High vulnerabilities: $HIGH_COUNT"
+          # Set output variables for GitHub Actions
+          echo "::set-output name=critical_count::$CRITICAL_COUNT"
+          echo "::set-output name=high_count::$HIGH_COUNT"
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
         if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
