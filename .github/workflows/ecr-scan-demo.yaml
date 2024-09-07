@@ -84,13 +84,14 @@ jobs:
           cd starter/backend
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}" .
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}"
-          sleep 30 
+
 
       - name: Check for critical and high vulnerabilities in AWS ECR scan results
         id: check-ecr-vulnerabilities
         env:
           ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
         run: |
+          sleep 120
           aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
           cat scan-results.json
           # Count CRITICAL severity vulnerabilities
