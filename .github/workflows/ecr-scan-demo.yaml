@@ -104,7 +104,7 @@ jobs:
           echo "HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
-        if: steps.check-ecr-vulnerabilities.outputs.critical_count != '0' || steps.check-ecr-vulnerabilities.outputs.high_count != '0'
+        if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
           CRITICAL_COUNT: ${{ env.CRITICAL_COUNT }}
@@ -131,5 +131,5 @@ jobs:
           }' $WEBHOOK_URL
 
       - name: Fail build if critical or high vulnerabilities found
-        if: steps.check-ecr-vulnerabilities.outputs.critical_count != '0' || steps.check-ecr-vulnerabilities.outputs.high_count != '0'
+        if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
         run: exit 1		
