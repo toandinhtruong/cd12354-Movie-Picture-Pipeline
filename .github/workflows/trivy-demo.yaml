@@ -107,6 +107,7 @@ jobs:
         id: check-vulnerabilities
         run: |
           # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
+          cat trivy-report.json
           CRITICAL_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")] | length' trivy-report.json)
           HIGH_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "HIGH")] | length' trivy-report.json)
           echo "Critical vulnerabilities: $CRITICAL_COUNT"
