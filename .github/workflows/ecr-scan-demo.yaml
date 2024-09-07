@@ -94,9 +94,9 @@ jobs:
           aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
           cat scan-results.json
           # Count CRITICAL severity vulnerabilities
-          CRITICAL_COUNT=$(jq '.imageScanFindings.enhancedFindings[]? | select(.severity == "CRITICAL") | length' scan-results.json || echo "0")
+          CRITICAL_COUNT=$(jq '[.imageScanFindings.enhancedFindings[]? | select(.severity == "CRITICAL")] | length' scan-results.json || echo "0")
           # Count HIGH severity vulnerabilities
-          HIGH_COUNT=$(jq '.imageScanFindings.enhancedFindings[]? | select(.severity == "HIGH") | length' scan-results.json || echo "0")
+          HIGH_COUNT=$(jq '[.imageScanFindings.enhancedFindings[]? | select(.severity == "HIGH")] | length' scan-results.json || echo "0")
           echo "Critical vulnerabilities: $CRITICAL_COUNT"
           echo "High vulnerabilities: $HIGH_COUNT"
           # Set output variables for GitHub Actions
