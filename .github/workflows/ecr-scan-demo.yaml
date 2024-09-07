@@ -84,7 +84,9 @@ jobs:
           cd starter/backend
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}" .
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}"
-          aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1
+          sleep 30 
+          aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
+          cat scan-results.json
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
         if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
