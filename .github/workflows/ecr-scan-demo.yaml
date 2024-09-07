@@ -92,6 +92,7 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
         run: |
           aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
+          cat scan-results.json
           # Count CRITICAL severity vulnerabilities
           CRITICAL_COUNT=$(jq '.imageScanFindings.enhancedFindings[]? | select(.severity == "CRITICAL") | length' scan-results.json || echo "0")
           # Count HIGH severity vulnerabilities
@@ -99,15 +100,15 @@ jobs:
           echo "Critical vulnerabilities: $CRITICAL_COUNT"
           echo "High vulnerabilities: $HIGH_COUNT"
           # Set output variables for GitHub Actions
-          echo "::set-output name=critical_count::$CRITICAL_COUNT"
-          echo "::set-output name=high_count::$HIGH_COUNT"
+          echo "CRITICAL_COUNT=$CRITICAL_COUNT" >> $GITHUB_ENV
+          echo "HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
         if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
-          CRITICAL_COUNT: ${{ steps.check-vulnerabilities.outputs.critical_count }}
-          HIGH_COUNT: ${{ steps.check-vulnerabilities.outputs.high_count }}
+          CRITICAL_COUNT: ${{ env.CRITICAL_COUNT }}
+          HIGH_COUNT: ${{ env.HIGH_COUNT }}
         run: |
           # Replace the following URL with your Teams webhook URL
           curl -H 'Content-Type: application/json' -d '{
