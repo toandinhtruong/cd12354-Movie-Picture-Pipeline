@@ -1,0 +1,118 @@
+name: Trivy Demo Pass
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+  
+permissions:
+  id-token: write   # Required for OIDC authentication
+  contents: read
+
+jobs:
+  lint-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-lint
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install --dev
+
+      - name: Lint code
+        run: cd starter/backend && pipenv run lint
+
+  test-backend:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-backend-test
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: cd starter/backend && pipenv install
+
+      - name: Run tests
+        run: cd starter/backend && pipenv run test
+
+  backend-deploy:
+    needs: [ lint-backend, test-backend ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.ARN_Role }}
+          aws-region: us-east-1  # Replace with your AWS region
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+          IMAGE_TAG: toantd19
+        run: |
+          cd starter/backend
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}" .
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}"
+		      aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1
+
+      - name: Send alert to Microsoft Teams if vulnerabilities found
+        if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+        env:
+          WEBHOOK_URL: ${{ secrets.Teams_Hook }}
+          CRITICAL_COUNT: ${{ steps.check-vulnerabilities.outputs.critical_count }}
+          HIGH_COUNT: ${{ steps.check-vulnerabilities.outputs.high_count }}
+        run: |
+          # Replace the following URL with your Teams webhook URL
+          curl -H 'Content-Type: application/json' -d '{
+            "@type": "MessageCard",
+            "@context": "https://schema.org/extensions",
+            "summary": "Trivy Scan Report",
+            "themeColor": "FF0000",
+            "sections": [{
+              "activityTitle": "Trivy Vulnerability Scan",
+              "activitySubtitle": "Critical and High severity vulnerabilities found",
+              "facts": [{
+                "name": "Critical vulnerabilities",
+                "value": "'$CRITICAL_COUNT'"
+              },{
+                "name": "High vulnerabilities",
+                "value": "'$HIGH_COUNT'"
+              }],
+              "markdown": true
+            }]
+          }' $WEBHOOK_URL
+
+      - name: Fail build if critical or high vulnerabilities found
+        if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+        run: exit 1		
