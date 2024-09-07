@@ -85,13 +85,11 @@ jobs:
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}" .
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.run_number }}"
           sleep 30 
-          aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
 
       - name: Check for critical and high vulnerabilities in AWS ECR scan results
         id: check-ecr-vulnerabilities
         run: |
-          # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
-          cat scan-results.json
+          aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
           # Count CRITICAL severity vulnerabilities
           CRITICAL_COUNT=$(jq '[.imageScanFindings.enhancedFindings[]? | select(.severity == "CRITICAL")] | length' scan-results.json || echo "0")
           # Count HIGH severity vulnerabilities
