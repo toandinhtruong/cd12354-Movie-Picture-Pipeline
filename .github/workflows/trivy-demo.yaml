@@ -1,4 +1,4 @@
-name: Trivy Demo Pass
+name: Trivy Demo
 
 on:
   push:
@@ -131,8 +131,8 @@ jobs:
         if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
-          CRITICAL_COUNT: ${{ steps.check-vulnerabilities.outputs.critical_count }}
-          HIGH_COUNT: ${{ steps.check-vulnerabilities.outputs.high_count }}
+          CRITICAL_COUNT: ${{ env.CRITICAL_COUNT }}
+          HIGH_COUNT: ${{ env.HIGH_COUNT }}
         run: |
           # Replace the following URL with your Teams webhook URL
           curl -H 'Content-Type: application/json' -d '{
