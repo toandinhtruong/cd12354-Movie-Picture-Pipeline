@@ -124,11 +124,11 @@ jobs:
           HIGH_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-report.json || echo "0")
           echo "Critical vulnerabilities: $CRITICAL_COUNT"
           echo "High vulnerabilities: $HIGH_COUNT"
-          echo "::set-output name=critical_count::$CRITICAL_COUNT"
-          echo "::set-output name=high_count::$HIGH_COUNT"
+          echo "CRITICAL_COUNT=$CRITICAL_COUNT" >> $GITHUB_ENV
+          echo "HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
-        if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+        if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
           CRITICAL_COUNT: ${{ steps.check-vulnerabilities.outputs.critical_count }}
@@ -153,30 +153,9 @@ jobs:
               "markdown": true
             }]
           }' $WEBHOOK_URL
-      - name: Build, tag image to Amazon ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
-          IMAGE_TAG: toantd19
-        run: |
-          cd starter/backend
-          docker pull 730335291032.dkr.ecr.us-east-1.amazonaws.com/backend:9
-          ###docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-      
-      - name: Run Trivy vulnerability scanner (Table output)
-        uses: aquasecurity/trivy-action@0.20.0
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
-        with:
-          image-ref: 730335291032.dkr.ecr.us-east-1.amazonaws.com/backend:9
-          format: 'table'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
 
       - name: Fail build if critical or high vulnerabilities found
-        if: steps.check-vulnerabilities.outputs.critical_count != '0' || steps.check-vulnerabilities.outputs.high_count != '0'
+        if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
         run: exit 1		
 
       - name: push image to Amazon ECR
