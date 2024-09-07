@@ -120,8 +120,8 @@ jobs:
         run: |
           # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
           cat trivy-report.json
-          CRITICAL_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL")] | length' trivy-report.json || echo "0")
-          HIGH_COUNT=$(jq '[.Results[].Vulnerabilities[] | select(.Severity == "HIGH")] | length' trivy-report.json || echo "0")
+          CRITICAL_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-report.json || echo "0")
+          HIGH_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-report.json || echo "0")
           echo "Critical vulnerabilities: $CRITICAL_COUNT"
           echo "High vulnerabilities: $HIGH_COUNT"
           echo "::set-output name=critical_count::$CRITICAL_COUNT"
