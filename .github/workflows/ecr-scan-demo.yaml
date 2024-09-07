@@ -113,10 +113,10 @@ jobs:
           curl -H 'Content-Type: application/json' -d '{
             "@type": "MessageCard",
             "@context": "https://schema.org/extensions",
-            "summary": "Trivy Scan Report",
+            "summary": "ECR Scan Report",
             "themeColor": "FF0000",
             "sections": [{
-              "activityTitle": "Trivy Vulnerability Scan",
+              "activityTitle": "ECR Vulnerability Scan",
               "activitySubtitle": "Critical and High severity vulnerabilities found",
               "facts": [{
                 "name": "Critical vulnerabilities",
