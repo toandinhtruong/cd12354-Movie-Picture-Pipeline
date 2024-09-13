@@ -89,7 +89,7 @@ jobs:
         env:
           ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
         run: |
-          sleep 30
+          sleep 60
           aws ecr describe-image-scan-findings --repository-name $ECR_REPOSITORY --image-id imageTag=${{ github.run_number }} --region us-east-1 > scan-results.json
           cat scan-results.json
           # Count CRITICAL severity vulnerabilities
