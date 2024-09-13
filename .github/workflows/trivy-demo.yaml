@@ -119,19 +119,17 @@ jobs:
           # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
           CRITICAL_VULNS=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | .VulnerabilityID + ": " + .PkgName + " " + .InstalledVersion + " " + .FixedVersion] | join("\n")' trivy-report.json || echo "No critical vulnerabilities found")
           HIGH_VULNS=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH") | .VulnerabilityID + ": " + .PkgName + " " + .InstalledVersion + " " + .FixedVersion] | join("\n")' trivy-report.json || echo "No high vulnerabilities found")
-          echo "Critical vulnerabilities:\n$CRITICAL_VULNS" > critical_vulns.txt
-          echo "High vulnerabilities:\n$HIGH_VULNS" > high_vulns.txt
-          echo "CRITICAL_VULNS=$(cat critical_vulns.txt)" >> $GITHUB_ENV
-          echo "HIGH_VULNS=$(cat high_vulns.txt)" >> $GITHUB_ENV
+          echo "CRITICAL_VULNS=$(echo "$CRITICAL_VULNS" | jq -Rsa .)" >> $GITHUB_ENV
+          echo "HIGH_VULNS=$(echo "$HIGH_VULNS" | jq -Rsa .)" >> $GITHUB_ENV
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
-        if: env.CRITICAL_VULNS != '' || env.HIGH_VULNS != ''
+        if: env.CRITICAL_VULNS != '[]' || env.HIGH_VULNS != '[]'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
           CRITICAL_VULNS: ${{ env.CRITICAL_VULNS }}
           HIGH_VULNS: ${{ env.HIGH_VULNS }}
         run: |
-          # Replace the following URL with your Teams webhook URL
+          # Format the message payload with properly escaped content
           curl -H 'Content-Type: application/json' -d '{
             "@type": "MessageCard",
             "@context": "https://schema.org/extensions",
@@ -142,10 +140,10 @@ jobs:
               "activitySubtitle": "Critical and High severity vulnerabilities found",
               "facts": [{
                 "name": "Critical vulnerabilities",
-                "value": "'"$(echo -e "${CRITICAL_VULNS}")"'"
+                "value": "'"$(echo -e "${CRITICAL_VULNS}" | sed 's/"/\\"/g')"'""
               },{
                 "name": "High vulnerabilities",
-                "value": "'"$(echo -e "${HIGH_VULNS}")"'"
+                "value": "'"$(echo -e "${HIGH_VULNS}" | sed 's/"/\\"/g')"'""
               }],
               "markdown": true
             }]
