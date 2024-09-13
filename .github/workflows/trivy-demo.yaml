@@ -113,23 +113,39 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.20.0
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BE_REPO_NAME }}
+        with:
+          image-ref: '${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.run_number }}'
+          format: 'json'
+          output: 'trivy-report.json'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
       - name: Check for critical and high vulnerabilities
         id: check-vulnerabilities
         run: |
           # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
-          CRITICAL_VULNS=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | "\(.VulnerabilityID): \(.PkgName) \(.InstalledVersion) \(.FixedVersion)"] | join("\n")' trivy-report.json || echo "No critical vulnerabilities found")
-          HIGH_VULNS=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH") | "\(.VulnerabilityID): \(.PkgName) \(.InstalledVersion) \(.FixedVersion)"] | join("\n")' trivy-report.json || echo "No high vulnerabilities found")
-          echo "CRITICAL_VULNS=$(echo "$CRITICAL_VULNS" | jq -Rs .)" >> $GITHUB_ENV
-          echo "HIGH_VULNS=$(echo "$HIGH_VULNS" | jq -Rs .)" >> $GITHUB_ENV
+          cat trivy-report.json
+          CRITICAL_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-report.json || echo "0")
+          HIGH_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-report.json || echo "0")
+          echo "Critical vulnerabilities: $CRITICAL_COUNT"
+          echo "High vulnerabilities: $HIGH_COUNT"
+          echo "CRITICAL_COUNT=$CRITICAL_COUNT" >> $GITHUB_ENV
+          echo "HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
-        if: env.CRITICAL_VULNS != '[]' || env.HIGH_VULNS != '[]'
+        if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
-          CRITICAL_VULNS: ${{ env.CRITICAL_VULNS }}
-          HIGH_VULNS: ${{ env.HIGH_VULNS }}
+          CRITICAL_COUNT: ${{ env.CRITICAL_COUNT }}
+          HIGH_COUNT: ${{ env.HIGH_COUNT }}
         run: |
-          # Format the message payload with properly escaped content
+          # Replace the following URL with your Teams webhook URL
           curl -H 'Content-Type: application/json' -d '{
             "@type": "MessageCard",
             "@context": "https://schema.org/extensions",
@@ -140,10 +156,10 @@ jobs:
               "activitySubtitle": "Critical and High severity vulnerabilities found",
               "facts": [{
                 "name": "Critical vulnerabilities",
-                "value": '"'"$(echo -e "${CRITICAL_VULNS}" | sed 's/"/\\"/g')"'"
+                "value": "'$CRITICAL_COUNT'"
               },{
                 "name": "High vulnerabilities",
-                "value": '"'"$(echo -e "${HIGH_VULNS}" | sed 's/"/\\"/g')"'"
+                "value": "'$HIGH_COUNT'"
               }],
               "markdown": true
             }]
