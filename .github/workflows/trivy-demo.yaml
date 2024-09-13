@@ -117,20 +117,19 @@ jobs:
         id: check-vulnerabilities
         run: |
           # Parse JSON and extract vulnerabilities with CRITICAL or HIGH severity
-          cat trivy-report.json
-          CRITICAL_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-report.json || echo "0")
-          HIGH_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-report.json || echo "0")
-          echo "Critical vulnerabilities: $CRITICAL_COUNT"
-          echo "High vulnerabilities: $HIGH_COUNT"
-          echo "CRITICAL_COUNT=$CRITICAL_COUNT" >> $GITHUB_ENV
-          echo "HIGH_COUNT=$HIGH_COUNT" >> $GITHUB_ENV
+          CRITICAL_VULNS=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | .VulnerabilityID + ": " + .PkgName + " " + .InstalledVersion + " " + .FixedVersion] | join("\n")' trivy-report.json || echo "No critical vulnerabilities found")
+          HIGH_VULNS=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH") | .VulnerabilityID + ": " + .PkgName + " " + .InstalledVersion + " " + .FixedVersion] | join("\n")' trivy-report.json || echo "No high vulnerabilities found")
+          echo "Critical vulnerabilities:\n$CRITICAL_VULNS" > critical_vulns.txt
+          echo "High vulnerabilities:\n$HIGH_VULNS" > high_vulns.txt
+          echo "CRITICAL_VULNS=$(cat critical_vulns.txt)" >> $GITHUB_ENV
+          echo "HIGH_VULNS=$(cat high_vulns.txt)" >> $GITHUB_ENV
 
       - name: Send alert to Microsoft Teams if vulnerabilities found
-        if: env.CRITICAL_COUNT != '0' || env.HIGH_COUNT != '0'
+        if: env.CRITICAL_VULNS != '' || env.HIGH_VULNS != ''
         env:
           WEBHOOK_URL: ${{ secrets.Teams_Hook }}
-          CRITICAL_COUNT: ${{ env.CRITICAL_COUNT }}
-          HIGH_COUNT: ${{ env.HIGH_COUNT }}
+          CRITICAL_VULNS: ${{ env.CRITICAL_VULNS }}
+          HIGH_VULNS: ${{ env.HIGH_VULNS }}
         run: |
           # Replace the following URL with your Teams webhook URL
           curl -H 'Content-Type: application/json' -d '{
@@ -143,10 +142,10 @@ jobs:
               "activitySubtitle": "Critical and High severity vulnerabilities found",
               "facts": [{
                 "name": "Critical vulnerabilities",
-                "value": "'$CRITICAL_COUNT'"
+                "value": "'"$(echo -e "${CRITICAL_VULNS}")"'"
               },{
                 "name": "High vulnerabilities",
-                "value": "'$HIGH_COUNT'"
+                "value": "'"$(echo -e "${HIGH_VULNS}")"'"
               }],
               "markdown": true
             }]
